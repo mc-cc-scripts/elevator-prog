@@ -1,33 +1,59 @@
 local elevator = {}
+
+elevator.config = {
+    protocol = "elevator",
+    modemSlot = pocket and "back" or "right"
+}
 elevator.commands = {
     ["serve"] = {
-        func = function ()
+        func = function (args)
+            elevator:serve(elevator.config.protocol, args[2])
         end
     },
     ["floor"] = {
-        func = function ()
+        func = function (args)
         end
     }
 }
-function elevator:run(command)
+
+function elevator:serve(protocol, hostname)
+    rednet.host(protocol, hostname)
+    print('Serving elevator with protocol: ' .. protocol .. ' and hostname: ' .. hostname .. '...')
+
+    while true do
+        local deviceID, message, _ = rednet.receive(protocol)
+
+        -- handle stuff
+        -- floor computers should tell the server on which floor the elevator is
+        -- floor computers can send requests to call the elevator (button press on computer)
+        -- via the monitor on the moving platform, a player can send a request to move to a specific floor
+    end
+end
+
+function elevator:run(args)
+    local command = args[1]
     if self.commands[command] then
-        self.commands[command].func()
+        rednet.open(self.config.modemSlot)
+        
+        if not rednet.isOpen(self.config.modemSlot) then
+            error("Could not open modem '".. self.config.modemSlot .. "'")
+            return
+        end
+
+        self.commands[command].func(args)
+
+        rednet.close(self.config.modemSlot)
+    else
+        print("Command not found: " .. command)
     end
 end
 
 local args = {...}
-if not args[1] then
+if not args[2] then
     print("Missing arguments.")
     return
 else
-    for i = 1, #elevator.commands do
-        if args[1] == elevator.commands[i] then
-            elevator:run(elevator.commands[i])
-            return
-        end
-    end
-
-    print("Command not found: " .. args[1])
+    elevator:run(args)
 end
 
 return elevator

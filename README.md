@@ -15,5 +15,5 @@ A small elevator script.
 For testing purposes I would suggest to put a lever on the [2] Gearshift and a button on the [3] Sequenced Gearshift.
 
 ![Floor Setup](setup/elevator-floor-setup.jpg)
-- [1] Computer that should be placed on each floor, next to where the monitors will be.
+- [1] Computer that should be placed on each floor, next to where the monitors will be. Modems should be placed on the right side of each Computer. Otherwise the position needs to be changed within the elevator config. Every Computer should have a button on it to call the elevator.
 - [2] One or more monitors which are glued to the moving platform.
