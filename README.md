@@ -1,6 +1,8 @@
 # Elevator
 A small elevator script.
 
+**THIS PROJECT IS NOT YET FINISHED!**
+
 # Setup
 ![Server Setup](setup/elevator-server-setup.jpg)
 - [1] Rope Pulley which will move the platform up and down. (Don't forget the glue connecting platform and monitor!)
