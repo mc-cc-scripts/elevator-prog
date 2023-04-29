@@ -23,7 +23,8 @@ For testing purposes I would suggest to put a lever on the [2] Gearshift and a b
 ![Floor Setup](setup/elevator-floor-setup.jpg)
 - [1] Computer that should be placed on each floor, next to where the monitors will be. Each computer requires a modem. Every Computer should have a button on it to call the elevator.
 - [2] Two monitors which are glued to the moving platform.
-![Glued Platform](setup/elevator-glued-platform.jpg)
+
+    ![Glued Platform](setup/elevator-glued-platform.jpg)
 
 ### Programs
 - First install [SCM](https://github.com/mc-cc-scripts/script-manager) on every computer with the following command: `pastebin run 1kKZ8zTS`
