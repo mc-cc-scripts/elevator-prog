@@ -40,62 +40,89 @@ end
 
 function elevator:serve(protocol, hostname)
     rednet.host(protocol, hostname)
-    print('Serving elevator with protocol: ' .. protocol .. ' and hostname: ' .. hostname)
+    print('Elevator started with protocol: ' .. protocol .. ' and hostname: ' .. hostname)
+    print("Add floors with `elevator floor " .. hostname .. " <floor_number>`.")
 
     local queue = {}
     local currentPos = -1 -- has to be set by the first floor that connects to the monitor
     local moveDown = false
     local status = "idle"
     local lastIndex = 0
+    local floors = {}
 
     while true do
-        print("loop")
-        local _, message, _ = rednet.receive(protocol)
-        print(message)
+        local id, message, _ = rednet.receive(protocol)
         local obj = unpack(message)
 
         if (obj) then
-            print("yep")
+            if not floors[obj.floor] then
+                floors[obj.floor] = id
+            end
+
             if obj.type == "call" then
-                print(currentPos, obj.floor)
+                print("Received call to floor " .. obj.floor)
                 if currentPos ~= obj.floor then
                     lastIndex = lastIndex + 1
                     queue[obj.floor] = lastIndex
+                    print("Floor " .. obj.floor .. " added to queue.")
                 end
             elseif obj.type == "reached" then
+                print("Reached floor " .. obj.floor)
                 currentPos = obj.floor
                 if (queue[currentPos]) then
                     queue[currentPos] = nil
                     if tablelength(queue) == 0 then lastIndex = 0 end
-                    sleep(self.config.waitAtTarget)
                 end
 
                 status = "idle"
+                print("Status set to \"idle\".")
             end
         end
 
         if currentPos ~= -1 and status == "idle" then
-            print ("queue length", tablelength(queue))
             if tablelength(queue) > 0 then
                 local targetFloor = nil
                 local minIndex = nil
+                local floorQueue = ""
                 for floor, index in pairs(queue) do
-                    print("for pairs", floor, index, targetFloor)
+                    floorQueue = floorQueue .. floor .. " "
                     if targetFloor == nil or minIndex > index then
                         targetFloor = floor
                         minIndex = index
                     end
+
+                    local sendObj = {
+                        type = "sleep",
+                        duration = self.config.waitAtTarget
+                    }
+                    print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.")
+                    rednet.send(floors[floor], pack(sendObj), protocol)
                 end
+
+                print("Queue: " .. floorQueue)
+                print("Next target: " .. targetFloor)
 
                 moveDown = currentPos > targetFloor
 
                 status = "moving"
+                print("Status set to \"moving\".")
                 redstone.setOutput(self.config.gearshiftSide, moveDown)
                 sleep(0.1)
                 redstone.setOutput(self.config.sequencedGearshiftSide, true)
                 sleep(0.4)
                 redstone.setOutput(self.config.sequencedGearshiftSide, false)
             end
+        end
+    end
+end
+
+function elevator:waitAtTarget()
+    while true do 
+        local _, message, _ = rednet.receive(self.protocol)
+        local obj = unpack(message)
+        if obj.type == "sleep" then
+            self.wait = tonumber(obj.duration)
+            print("Received request to wait " .. self.wait .. " seconds.")
         end
     end
 end
@@ -116,6 +143,13 @@ function elevator:waitForMonitorConnect()
                     floor = self.floor
                 }
 
+                if self.wait > 0 then
+                    print("Waiting " .. self.wait .. " seconds.")
+                    sleep(self.wait)
+                    self.wait = 0
+                end
+
+                print ("Sending \"reached\" to server.")
                 rednet.send(self.server_id, pack(obj), self.protocol)
             end
         else
@@ -137,6 +171,7 @@ function elevator:waitForMonitorInput()
                 floor = targetFloor
             }
             
+            print("Sending \"call\" for floor " .. targetFloor .. " to server.")
             rednet.send(self.server_id, pack(obj), self.protocol)
         end
 
@@ -161,6 +196,7 @@ function elevator:waitForRedstoneSignal()
                 floor = self.floor
             }
 
+            print ("Received redstone input. Sending \"call\" for floor " .. self.floor .. " to server.")
             rednet.send(self.server_id, pack(obj), self.protocol)
         end
         sleep(0.5)
@@ -172,6 +208,7 @@ function elevator:floor(protocol, hostname, floor_number)
     self.server_id = rednet.lookup(protocol, hostname)
     self.protocol = protocol
     self.hostname = hostname
+    self.wait = 0
     if not self.server_id then
         print("Error: Could not connect to elevator server with hostname: " .. self.hostname .. " and protocol: " .. self.protocol)
         return
@@ -188,6 +225,9 @@ function elevator:floor(protocol, hostname, floor_number)
         end,
         function ()
             elevator:waitForRedstoneSignal()
+        end,
+        function ()
+            elevator:waitAtTarget()
         end
     )
 end
@@ -202,7 +242,7 @@ function elevator:run(args)
         end
 
         peripheral.find("modem", rednet.open)
-        
+
         if not rednet.isOpen() then
             error("Could not open modem.")
             return
