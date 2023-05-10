@@ -1,3 +1,4 @@
+---@class elevator
 local elevator = {}
 
 elevator.config = {
@@ -9,6 +10,7 @@ elevator.config = {
 }
 elevator.commands = {
     ["serve"] = {
+        ---@param args table
         func = function (args)
             elevator:serve(elevator.config.protocol, args[2])
         end,
@@ -16,6 +18,7 @@ elevator.commands = {
         help = "elevator serve <elevator_name>"
     },
     ["floor"] = {
+        ---@param args table
         func = function (args)
             elevator:floor(elevator.config.protocol, args[2], args[3])
         end,
@@ -23,11 +26,41 @@ elevator.commands = {
         help = "elevator floor <elevator_name> <floor_number>"
     }
 }
+elevator.ui = {
+    colors = {
+        background = colors.yellow,
+        text = colors.black,
+        currentFloorBg = colors.red,
+        queuedFloorBg = colors.orange,
+        floorBg = colors.white
+    },
+    
+    ---@param width integer
+    ---@param height integer
+    ---@param floors table
+    --- floors should be an array of floors [{number, isCurrent, isQueued}, ...]
+    draw = function (width, height, floors)
+        ---@TODO: Draw logic
+    end,
 
+    ---@param button integer
+    ---@param x integer
+    ---@param y integer
+    click = function (button, x, y)
+        ---@TODO: Click logic
+    end
+}
+
+--- Not really needed as extra functions
+--- maybe get rid of them and just use textutils.serialise / unserialise
+---@param obj table
+---@return string
 local function pack(obj)
     return textutils.serialise(obj)
 end
 
+---@param obj string
+---@return table | nil
 local function unpack(str)
     return textutils.unserialise(str)
 end
@@ -39,6 +72,8 @@ local function tablelength(T)
     return count
 end
 
+---@param protocol string
+---@param hostname string
 function elevator:serve(protocol, hostname)
     rednet.host(protocol, hostname)
     print('Elevator started with protocol: ' .. protocol .. ' and hostname: ' .. hostname)
@@ -162,6 +197,12 @@ end
 
 function elevator:waitForMonitorInput()
     while true do
+        
+    end
+end
+
+function elevator:waitForInput()
+    while true do
         if self.monitor then
             if self.config.verbose then print("Floor: " .. self.floor) end
             if self.config.verbose then print("Target floor: ") end
@@ -204,6 +245,9 @@ function elevator:waitForRedstoneSignal()
     end
 end
 
+---@param protocol string
+---@param hostname string
+---@param floor_number string
 function elevator:floor(protocol, hostname, floor_number)
     self.floor = floor_number
     self.server_id = rednet.lookup(protocol, hostname)
@@ -222,7 +266,7 @@ function elevator:floor(protocol, hostname, floor_number)
             elevator:waitForMonitorConnect()
         end,
         function ()
-            elevator:waitForMonitorInput()            
+            elevator:waitForInput()            
         end,
         function ()
             elevator:waitForRedstoneSignal()
@@ -233,6 +277,7 @@ function elevator:floor(protocol, hostname, floor_number)
     )
 end
 
+---@param args table
 function elevator:run(args)
     local command = args[1]
     if self.commands[command] then
