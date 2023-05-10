@@ -46,6 +46,8 @@ elevator.ui = {
     ---@param button integer
     ---@param x integer
     ---@param y integer
+    ---@return table | nil
+    --- Should return a call to be made to the server or nil
     click = function (button, x, y)
         ---@TODO: Click logic
     end
@@ -197,7 +199,9 @@ end
 
 function elevator:waitForMonitorInput()
     while true do
-        
+        local event, button, x, y = os.pullEvent("mouse_click")
+        local result = self.ui.click(button, x, y)
+        ---@TODO: Handle result
     end
 end
 
@@ -267,6 +271,9 @@ function elevator:floor(protocol, hostname, floor_number)
         end,
         function ()
             elevator:waitForInput()            
+        end,
+        function ()
+            elevator:waitForMonitorInput()            
         end,
         function ()
             elevator:waitForRedstoneSignal()
