@@ -4,7 +4,8 @@ elevator.config = {
     protocol = "elevator",
     waitAtTarget = 2, -- wait 2 seconds at every target
     gearshiftSide = "left",
-    sequencedGearshiftSide = "back"
+    sequencedGearshiftSide = "back",
+    verbose = true
 }
 elevator.commands = {
     ["serve"] = {
@@ -60,14 +61,14 @@ function elevator:serve(protocol, hostname)
             end
 
             if obj.type == "call" then
-                print("Received call to floor " .. obj.floor)
+                if self.config.verbose then print("Received call to floor " .. obj.floor) end
                 if currentPos ~= obj.floor then
                     lastIndex = lastIndex + 1
                     queue[obj.floor] = lastIndex
-                    print("Floor " .. obj.floor .. " added to queue.")
+                    if self.config.verbose then print("Floor " .. obj.floor .. " added to queue.") end
                 end
             elseif obj.type == "reached" then
-                print("Reached floor " .. obj.floor)
+                if self.config.verbose then print("Reached floor " .. obj.floor) end
                 currentPos = obj.floor
                 if (queue[currentPos]) then
                     queue[currentPos] = nil
@@ -75,7 +76,7 @@ function elevator:serve(protocol, hostname)
                 end
 
                 status = "idle"
-                print("Status set to \"idle\".")
+                if self.config.verbose then print("Status set to \"idle\".") end
             end
         end
 
@@ -95,17 +96,17 @@ function elevator:serve(protocol, hostname)
                         type = "sleep",
                         duration = self.config.waitAtTarget
                     }
-                    print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.")
+                    if self.config.verbose then print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.") end
                     rednet.send(floors[floor], pack(sendObj), protocol)
                 end
 
-                print("Queue: " .. floorQueue)
-                print("Next target: " .. targetFloor)
+                if self.config.verbose then print("Queue: " .. floorQueue) end
+                if self.config.verbose then print("Next target: " .. targetFloor) end
 
                 moveDown = currentPos > targetFloor
 
                 status = "moving"
-                print("Status set to \"moving\".")
+                if self.config.verbose then print("Status set to \"moving\".") end
                 redstone.setOutput(self.config.gearshiftSide, moveDown)
                 sleep(0.1)
                 redstone.setOutput(self.config.sequencedGearshiftSide, true)
@@ -122,7 +123,7 @@ function elevator:waitAtTarget()
         local obj = unpack(message)
         if obj.type == "sleep" then
             self.wait = tonumber(obj.duration)
-            print("Received request to wait " .. self.wait .. " seconds.")
+            if self.config.verbose then print("Received request to wait " .. self.wait .. " seconds.") end
         end
     end
 end
@@ -144,12 +145,12 @@ function elevator:waitForMonitorConnect()
                 }
 
                 if self.wait > 0 then
-                    print("Waiting " .. self.wait .. " seconds.")
+                    if self.config.verbose then print("Waiting " .. self.wait .. " seconds.") end
                     sleep(self.wait)
                     self.wait = 0
                 end
 
-                print ("Sending \"reached\" to server.")
+                if self.config.verbose then print ("Sending \"reached\" to server.") end
                 rednet.send(self.server_id, pack(obj), self.protocol)
             end
         else
@@ -162,16 +163,16 @@ end
 function elevator:waitForMonitorInput()
     while true do
         if self.monitor then
-            print("Floor: " .. self.floor)
-            print("Target floor: ")
+            if self.config.verbose then print("Floor: " .. self.floor) end
+            if self.config.verbose then print("Target floor: ") end
             local targetFloor = read()
-            print("targetFloor: " .. targetFloor)
+            if self.config.verbose then print("targetFloor: " .. targetFloor) end
             local obj = {
                 type = "call",
                 floor = targetFloor
             }
             
-            print("Sending \"call\" for floor " .. targetFloor .. " to server.")
+            if self.config.verbose then print("Sending \"call\" for floor " .. targetFloor .. " to server.") end
             rednet.send(self.server_id, pack(obj), self.protocol)
         end
 
@@ -196,7 +197,7 @@ function elevator:waitForRedstoneSignal()
                 floor = self.floor
             }
 
-            print ("Received redstone input. Sending \"call\" for floor " .. self.floor .. " to server.")
+            if self.config.verbose then print ("Received redstone input. Sending \"call\" for floor " .. self.floor .. " to server.") end
             rednet.send(self.server_id, pack(obj), self.protocol)
         end
         sleep(0.5)
