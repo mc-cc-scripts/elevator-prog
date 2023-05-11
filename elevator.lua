@@ -1,3 +1,9 @@
+---@class scm
+local scm = require("./scm")
+
+---@class HelperFunctions
+local helper = scm:load("helperFunctions")
+
 ---@class elevator
 local elevator = {}
 
@@ -6,7 +12,8 @@ elevator.config = {
     waitAtTarget = 2, -- wait 2 seconds at every target
     gearshiftSide = "left",
     sequencedGearshiftSide = "back",
-    verbose = true
+    verbose = true,
+    uiLibrary = "elevatorDefaultUI"
 }
 elevator.commands = {
     ["serve"] = {
@@ -26,32 +33,8 @@ elevator.commands = {
         help = "elevator floor <elevator_name> <floor_number>"
     }
 }
-elevator.ui = {
-    colors = {
-        background = colors.yellow,
-        text = colors.black,
-        currentFloorBg = colors.red,
-        queuedFloorBg = colors.orange,
-        floorBg = colors.white
-    },
-    
-    ---@param width integer
-    ---@param height integer
-    ---@param floors table
-    --- floors should be an array of floors [{number, isCurrent, isQueued}, ...]
-    draw = function (width, height, floors)
-        ---@TODO: Draw logic
-    end,
 
-    ---@param button integer
-    ---@param x integer
-    ---@param y integer
-    ---@return table | nil
-    --- Should return a call to be made to the server or nil
-    click = function (button, x, y)
-        ---@TODO: Click logic
-    end
-}
+elevator.ui = scm:load(elevator.config.uiLibrary)
 
 --- Not really needed as extra functions
 --- maybe get rid of them and just use textutils.serialise / unserialise
@@ -67,13 +50,6 @@ local function unpack(str)
     return textutils.unserialise(str)
 end
 
--- @TODO: should load from scm
-local function tablelength(T)
-    local count = 0
-    for _ in pairs(T) do count = count + 1 end
-    return count
-end
-
 ---@param protocol string
 ---@param hostname string
 function elevator:serve(protocol, hostname)
@@ -86,15 +62,15 @@ function elevator:serve(protocol, hostname)
     local moveDown = false
     local status = "idle"
     local lastIndex = 0
-    local floors = {}
+    self.floors = {}
 
     while true do
         local id, message, _ = rednet.receive(protocol)
         local obj = unpack(message)
 
         if (obj) then
-            if not floors[obj.floor] then
-                floors[obj.floor] = id
+            if obj.type == "register" or not self.floors[obj.floor] then
+                self.floors[obj.floor] = id
             end
 
             if obj.type == "call" then
@@ -109,16 +85,32 @@ function elevator:serve(protocol, hostname)
                 currentPos = obj.floor
                 if (queue[currentPos]) then
                     queue[currentPos] = nil
-                    if tablelength(queue) == 0 then lastIndex = 0 end
+                    if helper.tablelength(queue) == 0 then lastIndex = 0 end
                 end
 
                 status = "idle"
                 if self.config.verbose then print("Status set to \"idle\".") end
             end
+
+            -- broadcast floor info to all floors
+            local obj = {
+                type = "update_floors",
+                floors = {}
+            }
+            local index = 1
+            for floor, id in pairs(self.floors) do
+                obj.floors[index] = {
+                    number = floor,
+                    isCurrent = currentPos == floor and true or false,
+                    isQueued = queue[floor] and true or false
+                }
+                index = index + 1
+            end
+            rednet.broadcast(pack(obj), protocol)
         end
 
         if currentPos ~= -1 and status == "idle" then
-            if tablelength(queue) > 0 then
+            if helper.tablelength(queue) > 0 then
                 local targetFloor = nil
                 local minIndex = nil
                 local floorQueue = ""
@@ -134,7 +126,7 @@ function elevator:serve(protocol, hostname)
                         duration = self.config.waitAtTarget
                     }
                     if self.config.verbose then print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.") end
-                    rednet.send(floors[floor], pack(sendObj), protocol)
+                    rednet.send(self.floors[floor], pack(sendObj), protocol)
                 end
 
                 if self.config.verbose then print("Queue: " .. floorQueue) end
@@ -154,13 +146,18 @@ function elevator:serve(protocol, hostname)
     end
 end
 
-function elevator:waitAtTarget()
+
+-- Floor functions
+function elevator:floorReceive()
     while true do 
         local _, message, _ = rednet.receive(self.protocol)
         local obj = unpack(message)
-        if obj.type == "sleep" then
+        if obj and obj.type == "sleep" then
             self.wait = tonumber(obj.duration)
             if self.config.verbose then print("Received request to wait " .. self.wait .. " seconds.") end
+        elseif obj and obj.type == "update_floors" then
+            self.floors = obj.floors
+            if self.monitor then self.ui.draw(self.ui, self.floors) end
         end
     end
 end
@@ -175,6 +172,8 @@ function elevator:waitForMonitorConnect()
                 self.monitor.setCursorPos(1, 1)
                 self.monitor.write("Floor:")
                 self.monitor.write(self.floor)
+
+                self.ui.draw(self.ui, self.floors)
 
                 local obj = {
                     type = "reached",
@@ -199,9 +198,20 @@ end
 
 function elevator:waitForMonitorInput()
     while true do
-        local event, button, x, y = os.pullEvent("mouse_click")
-        local result = self.ui.click(button, x, y)
-        ---@TODO: Handle result
+        local _, side, x, y = os.pullEvent("monitor_touch")
+        local floor_clicked = self.ui:click(side, x, y)
+        if floor_clicked then
+            if self.config.verbose then print ("Floor clicked: " .. floor_clicked) end
+            local obj = {
+                type = "call",
+                floor = floor_clicked
+            }
+            
+            if self.config.verbose then print("Sending \"call\" for floor " .. floor_clicked .. " to server.") end
+            rednet.send(self.server_id, pack(obj), self.protocol)
+
+            if self.monitor then self.ui.draw(self.ui, self.floors) end
+        end
     end
 end
 
@@ -254,6 +264,7 @@ end
 ---@param floor_number string
 function elevator:floor(protocol, hostname, floor_number)
     self.floor = floor_number
+    self.floors = {}
     self.server_id = rednet.lookup(protocol, hostname)
     self.protocol = protocol
     self.hostname = hostname
@@ -264,6 +275,7 @@ function elevator:floor(protocol, hostname, floor_number)
     end
     
     print('Floor ' .. self.floor .. ' reporting to elevator with protocol: ' .. self.protocol .. ' and hostname: ' .. self.hostname)
+    rednet.send(self.server_id, pack({type="register", floor=self.floor}), self.protocol)
 
     parallel.waitForAny(
         function ()
@@ -279,7 +291,7 @@ function elevator:floor(protocol, hostname, floor_number)
             elevator:waitForRedstoneSignal()
         end,
         function ()
-            elevator:waitAtTarget()
+            elevator:floorReceive()
         end
     )
 end
