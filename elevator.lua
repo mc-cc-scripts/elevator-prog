@@ -36,20 +36,6 @@ elevator.commands = {
 
 elevator.ui = scm:load(elevator.config.uiLibrary)
 
---- Not really needed as extra functions
---- maybe get rid of them and just use textutils.serialise / unserialise
----@param obj table
----@return string
-local function pack(obj)
-    return textutils.serialise(obj)
-end
-
----@param obj string
----@return table | nil
-local function unpack(str)
-    return textutils.unserialise(str)
-end
-
 ---@param protocol string
 ---@param hostname string
 function elevator:serve(protocol, hostname)
@@ -66,7 +52,7 @@ function elevator:serve(protocol, hostname)
 
     while true do
         local id, message, _ = rednet.receive(protocol)
-        local obj = unpack(message)
+        local obj = textutils.unserialise(message)
 
         if (obj) then
             if obj.type == "register" or not self.floors[obj.floor] then
@@ -106,7 +92,7 @@ function elevator:serve(protocol, hostname)
                 }
                 index = index + 1
             end
-            rednet.broadcast(pack(obj), protocol)
+            rednet.broadcast(textutils.serialise(obj), protocol)
         end
 
         if currentPos ~= -1 and status == "idle" then
@@ -126,7 +112,7 @@ function elevator:serve(protocol, hostname)
                         duration = self.config.waitAtTarget
                     }
                     if self.config.verbose then print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.") end
-                    rednet.send(self.floors[floor], pack(sendObj), protocol)
+                    rednet.send(self.floors[floor], textutils.serialise(sendObj), protocol)
                 end
 
                 if self.config.verbose then print("Queue: " .. floorQueue) end
@@ -151,7 +137,7 @@ end
 function elevator:floorReceive()
     while true do 
         local _, message, _ = rednet.receive(self.protocol)
-        local obj = unpack(message)
+        local obj = textutils.unserialise(message)
         if obj and obj.type == "sleep" then
             self.wait = tonumber(obj.duration)
             if self.config.verbose then print("Received request to wait " .. self.wait .. " seconds.") end
@@ -187,7 +173,7 @@ function elevator:waitForMonitorConnect()
                 end
 
                 if self.config.verbose then print ("Sending \"reached\" to server.") end
-                rednet.send(self.server_id, pack(obj), self.protocol)
+                rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
             end
         else
             self.monitor = nil
@@ -208,7 +194,7 @@ function elevator:waitForMonitorInput()
             }
             
             if self.config.verbose then print("Sending \"call\" for floor " .. floor_clicked .. " to server.") end
-            rednet.send(self.server_id, pack(obj), self.protocol)
+            rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
 
             if self.monitor then self.ui.draw(self.ui, self.floors) end
         end
@@ -228,7 +214,7 @@ function elevator:waitForInput()
             }
             
             if self.config.verbose then print("Sending \"call\" for floor " .. targetFloor .. " to server.") end
-            rednet.send(self.server_id, pack(obj), self.protocol)
+            rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
         end
 
         sleep(0.5)
@@ -253,7 +239,7 @@ function elevator:waitForRedstoneSignal()
             }
 
             if self.config.verbose then print ("Received redstone input. Sending \"call\" for floor " .. self.floor .. " to server.") end
-            rednet.send(self.server_id, pack(obj), self.protocol)
+            rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
         end
         sleep(0.5)
     end
@@ -275,7 +261,7 @@ function elevator:floor(protocol, hostname, floor_number)
     end
     
     print('Floor ' .. self.floor .. ' reporting to elevator with protocol: ' .. self.protocol .. ' and hostname: ' .. self.hostname)
-    rednet.send(self.server_id, pack({type="register", floor=self.floor}), self.protocol)
+    rednet.send(self.server_id, textutils.serialise({type="register", floor=self.floor}), self.protocol)
 
     parallel.waitForAny(
         function ()
