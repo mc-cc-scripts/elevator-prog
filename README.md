@@ -39,4 +39,10 @@ That's it!
 ## Usage
 You can now call the elevator to a floor by pressing the button on the computer.
 
-To chose a destination you can currently only type it in the computer and press enter. When this program is finished, you will be able to click the desired floor on the monitor instead.
+To chose a destination you can click the desired floor on the monitor or type the floor into the computer.
+
+# UI Libraries
+The UI library can be changed within the config. You could even load it from a pastebin script!
+
+For further documentation, please check the README.md in the [default UI library](https://github.com/mc-cc-scripts/elevatorDefaultUI-lib).
+- [elevatorDefaultUI](https://github.com/mc-cc-scripts/elevatorDefaultUI-lib) - Default UI of the elevator
