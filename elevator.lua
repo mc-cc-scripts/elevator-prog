@@ -18,7 +18,7 @@ elevator.config = {
 elevator.commands = {
     ["serve"] = {
         ---@param args table
-        func = function (args)
+        func = function(args)
             elevator:serve(elevator.config.protocol, args[2])
         end,
         requiresArgs = 2,
@@ -26,7 +26,7 @@ elevator.commands = {
     },
     ["floor"] = {
         ---@param args table
-        func = function (args)
+        func = function(args)
             elevator:floor(elevator.config.protocol, args[2], args[3])
         end,
         requiresArgs = 3,
@@ -111,7 +111,9 @@ function elevator:serve(protocol, hostname)
                         type = "sleep",
                         duration = self.config.waitAtTarget
                     }
-                    if self.config.verbose then print ("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.") end
+                    if self.config.verbose then
+                        print("Telling floor " .. floor .. " to wait " .. self.config.waitAtTarget .. " seconds.")
+                    end
                     rednet.send(self.floors[floor], textutils.serialise(sendObj), protocol)
                 end
 
@@ -132,10 +134,9 @@ function elevator:serve(protocol, hostname)
     end
 end
 
-
 -- Floor functions
 function elevator:floorReceive()
-    while true do 
+    while true do
         local _, message, _ = rednet.receive(self.protocol)
         local obj = textutils.unserialise(message)
         if obj and obj.type == "sleep" then
@@ -172,7 +173,7 @@ function elevator:waitForMonitorConnect()
                     self.wait = 0
                 end
 
-                if self.config.verbose then print ("Sending \"reached\" to server.") end
+                if self.config.verbose then print("Sending \"reached\" to server.") end
                 rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
             end
         else
@@ -187,12 +188,12 @@ function elevator:waitForMonitorInput()
         local _, side, x, y = os.pullEvent("monitor_touch")
         local floor_clicked = self.ui:click(side, x, y)
         if floor_clicked then
-            if self.config.verbose then print ("Floor clicked: " .. floor_clicked) end
+            if self.config.verbose then print("Floor clicked: " .. floor_clicked) end
             local obj = {
                 type = "call",
                 floor = floor_clicked
             }
-            
+
             if self.config.verbose then print("Sending \"call\" for floor " .. floor_clicked .. " to server.") end
             rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
 
@@ -212,7 +213,7 @@ function elevator:waitForInput()
                 type = "call",
                 floor = targetFloor
             }
-            
+
             if self.config.verbose then print("Sending \"call\" for floor " .. targetFloor .. " to server.") end
             rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
         end
@@ -222,9 +223,9 @@ function elevator:waitForInput()
 end
 
 function elevator:waitForRedstoneSignal()
-    local sides = {"front", "back", "left", "right", "top", "bottom"}
+    local sides = { "front", "back", "left", "right", "top", "bottom" }
     while true do
-        local hasInput = false 
+        local hasInput = false
         for i = 1, #sides do
             if redstone.getInput(sides[i]) then
                 hasInput = true
@@ -238,7 +239,10 @@ function elevator:waitForRedstoneSignal()
                 floor = self.floor
             }
 
-            if self.config.verbose then print ("Received redstone input. Sending \"call\" for floor " .. self.floor .. " to server.") end
+            if self.config.verbose then
+                print("Received redstone input. Sending \"call\" for floor "
+                    .. self.floor .. " to server.")
+            end
             rednet.send(self.server_id, textutils.serialise(obj), self.protocol)
         end
         sleep(0.5)
@@ -256,27 +260,29 @@ function elevator:floor(protocol, hostname, floor_number)
     self.hostname = hostname
     self.wait = 0
     if not self.server_id then
-        print("Error: Could not connect to elevator server with hostname: " .. self.hostname .. " and protocol: " .. self.protocol)
+        print("Error: Could not connect to elevator server with hostname: "
+            .. self.hostname .. " and protocol: " .. self.protocol)
         return
     end
-    
-    print('Floor ' .. self.floor .. ' reporting to elevator with protocol: ' .. self.protocol .. ' and hostname: ' .. self.hostname)
-    rednet.send(self.server_id, textutils.serialise({type="register", floor=self.floor}), self.protocol)
+
+    print('Floor ' .. self.floor .. ' reporting to elevator with protocol: '
+        .. self.protocol .. ' and hostname: ' .. self.hostname)
+    rednet.send(self.server_id, textutils.serialise({ type = "register", floor = self.floor }), self.protocol)
 
     parallel.waitForAny(
-        function ()
+        function()
             elevator:waitForMonitorConnect()
         end,
-        function ()
-            elevator:waitForInput()            
+        function()
+            elevator:waitForInput()
         end,
-        function ()
-            elevator:waitForMonitorInput()            
+        function()
+            elevator:waitForMonitorInput()
         end,
-        function ()
+        function()
             elevator:waitForRedstoneSignal()
         end,
-        function ()
+        function()
             elevator:floorReceive()
         end
     )
@@ -314,7 +320,7 @@ function elevator:run(args)
     end
 end
 
-local args = {...}
+local args = { ... }
 elevator:run(args)
 
 return elevator
