@@ -1,3 +1,6 @@
+> [!WARNING]  
+> This project is deprecated as the functionality is obsolete due to the _new-ish_ elevators in Create.
+
 # Elevator
 A small and simple elevator script.
 
